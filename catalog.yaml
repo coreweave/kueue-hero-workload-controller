@@ -1,0 +1,16 @@
+# Minimal backstage Component entry
+# see https://coreweave.atlassian.net/wiki/spaces/PRODENG/pages/334135469/Backstage#HOWTO%3A-Write-a-Backstage-Catalog-file
+# yaml-language-server: $schema=https://backstage.int.coreweave.com/backstage-schema.bundle.json
+apiVersion: backstage.io/v1beta1
+kind: Component
+metadata:
+  name: "kueue-hero-workload-controller"
+  title: "false"
+  description: "A stopgap controller that lets "hero" workloads on Kueue with Topology Aware Scheduling (TAS) start promptly."
+  annotations:
+    coreweave.com/skeleton-marker: "true" # Marks template-generated catalog files for tooling/discovery
+spec:
+  lifecycle: dev
+  owner: "group:cw/team_sunk"
+  system: system:todo
+  type: service
