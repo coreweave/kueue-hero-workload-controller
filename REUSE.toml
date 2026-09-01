@@ -1,0 +1,21 @@
+version = 1
+SPDX-PackageName = "kueue-hero-workload-controller"
+SPDX-PackageSupplier = "CoreWeave, Inc."
+SPDX-PackageDownloadLocation = "https://github.com/coreweave/kueue-hero-workload-controller"
+
+# Aggregate fallback so files that cannot carry an inline header (YAML
+# fixtures, the license texts, top-level docs) are still covered. Inline
+# SPDX headers, where present, take precedence.
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 CoreWeave, Inc."
+SPDX-License-Identifier = "Apache-2.0"
+
+# Vendored verbatim from kueue (see hack/update-kueue-crds.sh); not
+# CoreWeave's work.
+[[annotations]]
+path = "test/crds/**"
+precedence = "override"
+SPDX-FileCopyrightText = "The Kubernetes Authors"
+SPDX-License-Identifier = "Apache-2.0"

@@ -1,0 +1,77 @@
+# Default values for kueue-hero-workload-controller.
+
+image:
+  repository: ghcr.io/coreweave/kueue-hero-workload-controller
+  # Defaults to the chart appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# One replica with leader election: only one instance may drive drains at a
+# time; extra replicas are warm standbys.
+replicaCount: 1
+leaderElection: true
+
+serviceAccount:
+  create: true
+  # Defaults to the chart fullname when empty.
+  name: ""
+  annotations: {}
+
+rbac:
+  # Create the ClusterRole/Role and bindings. The rules mirror the
+  # kubebuilder markers in pkg/controller (committed at config/rbac/role.yaml).
+  create: true
+
+# Controller configuration, rendered verbatim into a ConfigMap and passed
+# via --config. Every field is optional; omitted fields keep the built-in
+# defaults (shown here). See pkg/config for the full reference.
+config:
+  taintKey: hero.coreweave.com/taint
+  drainTimeout: 30m
+  # How often to re-nudge kueue while a drained domain sits empty and the
+  # hero unadmitted (first nudge is immediate; see taint.NudgeAnnotation).
+  # Each nudge re-evaluates every pending workload, so keep this slow.
+  nudgeInterval: 2m
+  heroCQLabelKey: hero.coreweave.com/enabled
+  heroPriorityClassName: hero-critical
+  gpuResourceName: nvidia.com/gpu
+  weights:
+    priority: 0.7
+    podCount: 0.2
+    runtime: 0.1
+  runtimeHalfLife: 6h
+  crossCQMultiplier: 5
+  stuckDetection: auto # auto | message | reason
+  # Start with dryRun: true in a new cluster; the controller plans drains
+  # and emits DrainPlannedDryRun events without tainting or evicting.
+  dryRun: false
+  nonBlockingPodLabels: {}
+
+metrics:
+  # Prometheus metrics endpoint (hero_drains_* series). ":8080" serves
+  # plain HTTP; ":8443" with secure: true serves HTTPS behind kube-rbac
+  # authn/authz. "0" disables the endpoint.
+  bindAddress: ":8080"
+  secure: false
+  service:
+    enabled: true
+    port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+podLabels: {}
+priorityClassName: ""
+
+# Extra args appended to the manager container (e.g. -zap-log-level=2).
+extraArgs: []
