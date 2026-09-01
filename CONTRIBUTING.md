@@ -58,6 +58,37 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ## 📝 Commit Guidelines
 
+### CLA & DCO
+
+All commits submitted must have a Git `Signed-off-by` trailer, signifying
+agreement to the terms of the CLA & DCO.
+
+Contributors must agree to the [CoreWeave CLA](./CLA.md) when pushing code
+to this project.
+
+Agreement with the CoreWeave CLA must signified by including a
+`Signed-Off-By` trailer in every submitted Git commit to this repository.
+By signing off, you certify that you have the right to submit the
+contribution and that you agree to and are bound by the CoreWeave
+Contributor License Agreement in effect at the date of your submission,
+found as [`CLA.md`](./CLA.md) in the root of this repository, which governs
+your submission. If you are contributing on behalf of an entity, you
+further certify that you are authorized to bind that entity to the CLA.
+
+Individual commits can be signed using the `--signoff` option to
+[`git commit`](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff);
+or a repo as a whole can use the `commit.signoff` configuration option.
+
+### Licensing (REUSE)
+
+This project is [REUSE](https://reuse.software/)-compliant and licensed
+under Apache-2.0 (see [LICENSE](./LICENSE)). Licensing metadata lives in
+[REUSE.toml](./REUSE.toml): its aggregate annotation covers every file by
+default, so new files need no SPDX header. If you add material under a
+different license or copyright, declare it with an inline SPDX header (the
+template is in `.reuse/templates/`) or a `REUSE.toml` annotation, and
+verify with `reuse lint`.
+
 We follow [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
 ### Commit Message Format
@@ -191,7 +222,7 @@ When reporting issues, please include:
 If you have questions or need help:
 
 - Check existing issues and pull requests
-- Reach out on Slack [#channel-name]
+- Open a GitHub issue
 - Contact the maintainers
 
 ## 🙏 Thank You!

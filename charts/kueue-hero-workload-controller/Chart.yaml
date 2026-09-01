@@ -1,0 +1,13 @@
+apiVersion: v2
+name: kueue-hero-workload-controller
+description: >-
+  Stopgap controller that unsticks "hero" workloads on Kueue Topology Aware
+  Scheduling: when a hero is stuck on a TAS no-fit, it taints the
+  cheapest-to-drain topology domains, suspends the victim workloads so Kueue
+  requeues them elsewhere, lets the taint-tolerating hero in, then removes
+  the taints.
+type: application
+# Chart and app versions are set at package time (helm package --version
+# --app-version); these are dev placeholders.
+version: 0.1.0
+appVersion: 0.1.0

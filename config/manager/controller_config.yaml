@@ -1,0 +1,16 @@
+# Example controller configuration. Mount as a file and pass --config.
+# Every field is optional; omitted fields keep the built-in defaults shown.
+taintKey: hero.coreweave.com/taint
+drainTimeout: 30m
+heroCQLabelKey: hero.coreweave.com/enabled
+heroPriorityClassName: hero-critical
+gpuResourceName: nvidia.com/gpu
+weights:
+  priority: 0.7
+  podCount: 0.2
+  runtime: 0.1
+runtimeHalfLife: 6h
+crossCQMultiplier: 5
+stuckDetection: auto # auto | message | reason
+dryRun: false
+nonBlockingPodLabels: {}

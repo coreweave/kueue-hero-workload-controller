@@ -1,0 +1,16 @@
+kueue-hero-workload-controller {{ .Chart.AppVersion }} installed in
+namespace {{ .Release.Namespace }}.
+
+Prerequisites this chart does NOT install:
+  - Kueue (>= 0.16.9) with Topology Aware Scheduling enabled
+  - A WorkloadPriorityClass named "{{ .Values.config.heroPriorityClassName }}"
+  - Hero-enabled ClusterQueues labeled {{ .Values.config.heroCQLabelKey }}=true
+
+{{- if .Values.config.dryRun }}
+
+dryRun is ON: the controller plans drains and emits DrainPlannedDryRun
+events, but never taints nodes or suspends workloads.
+{{- end }}
+
+How to submit hero workloads, troubleshooting, and metrics/alerting:
+docs/submitting-hero-workloads.md in the repository.

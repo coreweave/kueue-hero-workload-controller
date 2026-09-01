@@ -1,0 +1,8 @@
+# Kind cluster for the e2e suite: control plane only. Every GPU "node" is a
+# kwok-managed fake node created by the suite itself — arbitrary
+# nvidia.com/gpu allocatable and topology labels, and pods on them reach
+# Running without a kubelet.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
