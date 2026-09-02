@@ -18,12 +18,20 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ## 🚀 Getting Started
 
-1. **Clone the repository** locally:
+1. **Fork the repository** on GitHub.
+
+   If you run this controller in production, run it from your own fork. That
+   way you control your own infrastructure and release cadence, and can ship
+   a fix to your fork immediately. Once the fix is stable, upstream it here
+   through a pull request (see [Pull Request Process](#pull-request-process)).
+
+2. **Clone your fork** locally and add this repo as `upstream`:
    ```bash
-   git clone https://github.com/coreweave/kueue-hero-workload-controller.git
+   git clone https://github.com/<your-org>/kueue-hero-workload-controller.git
    cd kueue-hero-workload-controller
+   git remote add upstream https://github.com/coreweave/kueue-hero-workload-controller.git
    ```
-2. **Install dependencies** as described in the [README](./README.md)
+3. **Install dependencies** as described in the [README](./README.md)
 
 ## 🔄 Development Workflow
 
@@ -45,13 +53,14 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 4. **Commit your changes** following the [commit guidelines](#commit-guidelines)
 
-5. **Keep your branch updated**:
+5. **Keep your branch updated** with upstream `main`:
    ```bash
-   git fetch origin
-   git rebase origin/main
+   git fetch upstream
+   git rebase upstream/main
    ```
 
-6. **Push your branch**:
+6. **Push your branch** to your fork and open a pull request against
+   `coreweave/kueue-hero-workload-controller` `main`:
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -145,7 +154,10 @@ BREAKING CHANGE: authentication now requires OAuth2 tokens instead of API keys
 
 2. **Fill out the PR template** completely
 
-3. **Request review** from appropriate team members
+3. **Request review** from the CoreWeave maintainers. Every change to this
+   repository lands through a pull request, and a CoreWeave maintainer must
+   approve it before it merges. This applies to fixes upstreamed from forks
+   as well.
 
 4. **Address feedback** promptly and professionally
 
