@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	kueuev1beta2 "sigs.k8s.io/kueue/apis/kueue/v1beta2"
 
+	herocache "github.com/coreweave/kueue-hero-workload-controller/pkg/cache"
 	"github.com/coreweave/kueue-hero-workload-controller/pkg/config"
 	drainctrl "github.com/coreweave/kueue-hero-workload-controller/pkg/controller/drain"
 	janitorctrl "github.com/coreweave/kueue-hero-workload-controller/pkg/controller/janitor"
@@ -152,8 +153,12 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                metricsServerOptions,
+		Scheme:  scheme,
+		Metrics: metricsServerOptions,
+		// Pods, Nodes and Workloads are cached stripped to the fields the
+		// reconcilers read; see pkg/cache for why and for what that
+		// forbids (notably: no field may be read that is not kept there).
+		Cache:                  herocache.Options(&heroCfg),
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,

@@ -26,6 +26,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	kueuev1beta2 "sigs.k8s.io/kueue/apis/kueue/v1beta2"
 
+	herocache "github.com/coreweave/kueue-hero-workload-controller/pkg/cache"
 	"github.com/coreweave/kueue-hero-workload-controller/pkg/config"
 	janitorctrl "github.com/coreweave/kueue-hero-workload-controller/pkg/controller/janitor"
 )
@@ -75,9 +76,12 @@ var _ = BeforeSuite(func() {
 
 	testCfg = config.Default()
 
+	// Transforms as in cmd/main.go: the specs must exercise the stripped
+	// cache the controller actually reads from.
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:         scheme,
 		Metrics:        metricsserver.Options{BindAddress: "0"},
+		Cache:          herocache.Options(&testCfg),
 		LeaderElection: false,
 	})
 	Expect(err).NotTo(HaveOccurred())
