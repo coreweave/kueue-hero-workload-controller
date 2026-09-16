@@ -10,11 +10,13 @@ package drainctrl
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -22,11 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlbuilder "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	kueue "sigs.k8s.io/kueue/apis/kueue/v1beta2"
 
@@ -813,7 +817,8 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Named("hero-drain").
 		For(&kueue.Workload{}).
 		Watches(&kueue.Workload{}, handler.EnqueueRequestsFromMapFunc(r.mapHeroEventToStuck)).
-		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(r.mapNodeToOwner)).
+		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(r.mapNodeToOwner),
+			ctrlbuilder.WithPredicates(nodeAffectsPlacement())).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1})
 	if r.Nudge != nil {
 		builder = builder.WatchesRawSource(source.Channel(r.Nudge,
@@ -822,6 +827,43 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 			})))
 	}
 	return builder.Complete(r)
+}
+
+// nodeAffectsPlacement drops the node updates that cannot change a drain
+// decision. Kubelet rewrites every node's Ready condition heartbeat every
+// few seconds, so the great majority of node updates carry nothing this
+// controller reads — and each one used to fan out into a list of every
+// stuck workload. Only what the drain pipeline actually reads from a node
+// counts as a change: its drain taint and annotations, its topology
+// labels, its schedulability and its GPU capacity.
+func nodeAffectsPlacement() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldNode, okOld := e.ObjectOld.(*corev1.Node)
+			newNode, okNew := e.ObjectNew.(*corev1.Node)
+			if !okOld || !okNew {
+				return true // unknown shape: never silently drop it
+			}
+			return !apiequality.Semantic.DeepEqual(oldNode.Spec.Taints, newNode.Spec.Taints) ||
+				oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable ||
+				!maps.Equal(oldNode.Labels, newNode.Labels) ||
+				!maps.Equal(oldNode.Annotations, newNode.Annotations) ||
+				!apiequality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) ||
+				nodeIsReady(oldNode) != nodeIsReady(newNode)
+		},
+	}
+}
+
+// nodeIsReady reads the Ready condition's status without its heartbeat
+// timestamp, which changes constantly and means nothing here.
+func nodeIsReady(node *corev1.Node) bool {
+	ready := false
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == corev1.NodeReady {
+			ready = node.Status.Conditions[i].Status == corev1.ConditionTrue
+		}
+	}
+	return ready
 }
 
 // mapNodeToOwner routes node events: a node carrying our taint re-triggers

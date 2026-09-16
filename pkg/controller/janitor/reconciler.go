@@ -347,10 +347,31 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 		return false
 	})
+	// The janitor waits for hero pods to reach Running, so only a
+	// kueue-managed pod whose placement or phase actually moved can tell
+	// it anything. Without this every pod event in the cluster reached
+	// mapPodToTaintedNodes.
+	kueueManagedPod := predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		_, ok := obj.GetAnnotations()[kueue.WorkloadAnnotation]
+		return ok
+	})
+	podMoved := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldPod, okOld := e.ObjectOld.(*corev1.Pod)
+			newPod, okNew := e.ObjectNew.(*corev1.Pod)
+			if !okOld || !okNew {
+				return true
+			}
+			return oldPod.Status.Phase != newPod.Status.Phase ||
+				oldPod.Spec.NodeName != newPod.Spec.NodeName
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("hero-janitor").
 		For(&corev1.Node{}, builder.WithPredicates(hasDrainTaint)).
-		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.mapPodToTaintedNodes)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.mapPodToTaintedNodes),
+			builder.WithPredicates(kueueManagedPod, podMoved)).
 		Watches(&kueue.Workload{}, handler.Funcs{
 			DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[ctrl.Request]) {
 				for _, req := range r.taintedNodesOf(ctx, e.Object) {
