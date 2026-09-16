@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"github.com/coreweave/kueue-hero-workload-controller/pkg/config"
 	drainctrl "github.com/coreweave/kueue-hero-workload-controller/pkg/controller/drain"
 	janitorctrl "github.com/coreweave/kueue-hero-workload-controller/pkg/controller/janitor"
+	"github.com/coreweave/kueue-hero-workload-controller/pkg/index"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -177,6 +179,13 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "Failed to start manager")
+		os.Exit(1)
+	}
+
+	// Both controllers list by field index instead of listing whole
+	// collections, so the indexes must exist before they start.
+	if err := index.Register(context.Background(), mgr.GetFieldIndexer(), &heroCfg); err != nil {
+		setupLog.Error(err, "Failed to register field indexes")
 		os.Exit(1)
 	}
 
