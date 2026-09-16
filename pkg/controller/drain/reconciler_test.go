@@ -472,7 +472,8 @@ var _ = Describe("drain controller", func() {
 			WorkloadPriorityClassRef(testCfg.HeroPriorityClassName).
 			Priority(1500).
 			PodSets(*utiltesting.MakePodSet("main", 2).
-				RequiredTopologyRequest(levelBlock).
+				SliceRequiredTopologyRequest(levelBlock).
+				SliceSizeTopologyRequest(1).
 				Request(gpuRes, "8").
 				Toleration(corev1.Toleration{Key: testCfg.TaintKey, Operator: corev1.TolerationOpExists}).
 				Obj()).
