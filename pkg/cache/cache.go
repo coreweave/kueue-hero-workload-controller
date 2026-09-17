@@ -23,6 +23,7 @@ package cache
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	toolscache "k8s.io/client-go/tools/cache"
 	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,8 +37,15 @@ import (
 // few, small, and read field by field.
 func Options(cfg *config.Config) ctrlcache.Options {
 	return ctrlcache.Options{
+		DefaultTransform: ctrlcache.TransformStripManagedFields(),
 		ByObject: map[client.Object]ctrlcache.ByObject{
-			&corev1.Pod{}:     {Transform: TransformPod(cfg)},
+			&corev1.Pod{}: {
+				Transform: TransformPod(cfg),
+				Field: fields.AndSelectors(
+					fields.OneTermNotEqualSelector("status.phase", string(corev1.PodSucceeded)),
+					fields.OneTermNotEqualSelector("status.phase", string(corev1.PodFailed)),
+				),
+			},
 			&corev1.Node{}:    {Transform: TransformNode},
 			&kueue.Workload{}: {Transform: TransformWorkload},
 		},
@@ -134,18 +142,18 @@ func TransformWorkload(obj any) (any, error) {
 	for i := range wl.Spec.PodSets {
 		ps := &wl.Spec.PodSets[i]
 		ps.Template = corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-			Containers:  gpuOnlyContainers(ps.Template.Spec.Containers),
+			Containers:  stripToResources(ps.Template.Spec.Containers),
 			Tolerations: ps.Template.Spec.Tolerations,
 		}}
 	}
 	return wl, nil
 }
 
-// gpuOnlyContainers reduces containers to their resource requirements.
+// stripToResources reduces containers to their resource requirements.
 // Unlike the Pod transform this keeps every container: the GPU resource
 // name is a config value, and a podset's per-pod request is summed the
 // same way regardless, so there is nothing to gain from guessing here.
-func gpuOnlyContainers(containers []corev1.Container) []corev1.Container {
+func stripToResources(containers []corev1.Container) []corev1.Container {
 	out := containers[:0]
 	for i := range containers {
 		out = append(out, corev1.Container{Resources: containers[i].Resources})
