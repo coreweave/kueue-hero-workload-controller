@@ -16,7 +16,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -818,7 +817,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kueue.Workload{}).
 		Watches(&kueue.Workload{}, handler.EnqueueRequestsFromMapFunc(r.mapHeroEventToStuck)).
 		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(r.mapNodeToOwner),
-			ctrlbuilder.WithPredicates(nodeAffectsPlacement())).
+			ctrlbuilder.WithPredicates(r.nodeAffectsPlacement())).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1})
 	if r.Nudge != nil {
 		builder = builder.WatchesRawSource(source.Channel(r.Nudge,
@@ -836,7 +835,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 // stuck workload. Only what the drain pipeline actually reads from a node
 // counts as a change: its drain taint and annotations, its topology
 // labels, its schedulability and its GPU capacity.
-func nodeAffectsPlacement() predicate.Predicate {
+func (r *Reconciler) nodeAffectsPlacement() predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldNode, okOld := e.ObjectOld.(*corev1.Node)
@@ -844,13 +843,35 @@ func nodeAffectsPlacement() predicate.Predicate {
 			if !okOld || !okNew {
 				return true // unknown shape: never silently drop it
 			}
-			return !apiequality.Semantic.DeepEqual(oldNode.Spec.Taints, newNode.Spec.Taints) ||
-				oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable ||
-				!maps.Equal(oldNode.Labels, newNode.Labels) ||
-				!maps.Equal(oldNode.Annotations, newNode.Annotations) ||
-				!apiequality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) ||
-				snapshot.NodeReady(oldNode) != snapshot.NodeReady(newNode)
+			return !maps.Equal(oldNode.Labels, newNode.Labels) ||
+				r.nodeView(oldNode) != r.nodeView(newNode)
 		},
+	}
+}
+
+// nodeView is everything the drain pipeline derives from a node besides its
+// labels, reduced to comparable scalars so the predicate needs no reflection.
+// Usability comes from the snapshot's own NodeUsable, so taint and readiness
+// changes that the snapshot ignores (a taint's TimeAdded, a Ready heartbeat)
+// never wake the controller, and any field NodeUsable starts reading is
+// covered here without a second implementation to keep in sync.
+type nodeView struct {
+	usable    bool
+	gpu       int64 // resource.Quantity caches its string form; compare the value
+	owner     types.NamespacedName
+	startedAt string
+	nudge     string
+}
+
+func (r *Reconciler) nodeView(node *corev1.Node) nodeView {
+	owner, _ := taint.Owner(node, r.Cfg.TaintKey)
+	gpu := node.Status.Allocatable[r.Cfg.GPUResourceName]
+	return nodeView{
+		usable:    snapshot.NodeUsable(node, r.Cfg.TaintKey, owner),
+		gpu:       gpu.Value(),
+		owner:     owner,
+		startedAt: node.Annotations[taint.StartedAtAnnotation],
+		nudge:     node.Annotations[taint.NudgeAnnotation],
 	}
 }
 
