@@ -218,6 +218,13 @@ func nodeIsUsable(node *corev1.Node, taintKey string, self types.NamespacedName)
 		}
 		return false
 	}
+	return NodeReady(node) // no Ready condition = unknown health = unusable
+}
+
+// NodeReady reports whether the node's Ready condition is True. It reads only
+// the condition's status, not its heartbeat timestamp, which changes constantly
+// and says nothing about health. A node with no Ready condition is not ready.
+func NodeReady(node *corev1.Node) bool {
 	ready := false
 	for i := range node.Status.Conditions {
 		c := &node.Status.Conditions[i]
@@ -225,7 +232,7 @@ func nodeIsUsable(node *corev1.Node, taintKey string, self types.NamespacedName)
 			ready = c.Status == corev1.ConditionTrue // last entry wins
 		}
 	}
-	return ready // no Ready condition = unknown health = unusable
+	return ready
 }
 
 // markHeroDomains sets HasOtherHero on every domain where any podset of any

@@ -849,21 +849,9 @@ func nodeAffectsPlacement() predicate.Predicate {
 				!maps.Equal(oldNode.Labels, newNode.Labels) ||
 				!maps.Equal(oldNode.Annotations, newNode.Annotations) ||
 				!apiequality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) ||
-				nodeIsReady(oldNode) != nodeIsReady(newNode)
+				snapshot.NodeReady(oldNode) != snapshot.NodeReady(newNode)
 		},
 	}
-}
-
-// nodeIsReady reads the Ready condition's status without its heartbeat
-// timestamp, which changes constantly and means nothing here.
-func nodeIsReady(node *corev1.Node) bool {
-	ready := false
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == corev1.NodeReady {
-			ready = node.Status.Conditions[i].Status == corev1.ConditionTrue
-		}
-	}
-	return ready
 }
 
 // mapNodeToOwner routes node events: a node carrying our taint re-triggers
