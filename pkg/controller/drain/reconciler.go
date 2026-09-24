@@ -10,6 +10,7 @@ package drainctrl
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -22,11 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlbuilder "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	kueue "sigs.k8s.io/kueue/apis/kueue/v1beta2"
 
@@ -850,7 +853,8 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Named("hero-drain").
 		For(&kueue.Workload{}).
 		Watches(&kueue.Workload{}, handler.EnqueueRequestsFromMapFunc(r.mapHeroEventToStuck)).
-		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(r.mapNodeToOwner)).
+		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(r.mapNodeToOwner),
+			ctrlbuilder.WithPredicates(r.nodeAffectsPlacement())).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1})
 	if r.Nudge != nil {
 		builder = builder.WatchesRawSource(source.Channel(r.Nudge,
@@ -859,6 +863,53 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 			})))
 	}
 	return builder.Complete(r)
+}
+
+// nodeAffectsPlacement drops the node updates that cannot change a drain
+// decision. Kubelet rewrites every node's Ready condition heartbeat every
+// few seconds, so the great majority of node updates carry nothing this
+// controller reads — and each one used to fan out into a list of every
+// stuck workload. Only what the drain pipeline actually reads from a node
+// counts as a change: its drain taint and annotations, its topology
+// labels, its schedulability and its GPU capacity.
+func (r *Reconciler) nodeAffectsPlacement() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldNode, okOld := e.ObjectOld.(*corev1.Node)
+			newNode, okNew := e.ObjectNew.(*corev1.Node)
+			if !okOld || !okNew {
+				return true // unknown shape: never silently drop it
+			}
+			return !maps.Equal(oldNode.Labels, newNode.Labels) ||
+				r.nodeView(oldNode) != r.nodeView(newNode)
+		},
+	}
+}
+
+// nodeView is everything the drain pipeline derives from a node besides its
+// labels, reduced to comparable scalars so the predicate needs no reflection.
+// Usability comes from the snapshot's own NodeUsable, so taint and readiness
+// changes that the snapshot ignores (a taint's TimeAdded, a Ready heartbeat)
+// never wake the controller, and any field NodeUsable starts reading is
+// covered here without a second implementation to keep in sync.
+type nodeView struct {
+	usable    bool
+	gpu       int64 // resource.Quantity caches its string form; compare the value
+	owner     types.NamespacedName
+	startedAt string
+	nudge     string
+}
+
+func (r *Reconciler) nodeView(node *corev1.Node) nodeView {
+	owner, _ := taint.Owner(node, r.Cfg.TaintKey)
+	gpu := node.Status.Allocatable[r.Cfg.GPUResourceName]
+	return nodeView{
+		usable:    snapshot.NodeUsable(node, r.Cfg.TaintKey, owner),
+		gpu:       gpu.Value(),
+		owner:     owner,
+		startedAt: node.Annotations[taint.StartedAtAnnotation],
+		nudge:     node.Annotations[taint.NudgeAnnotation],
+	}
 }
 
 // mapNodeToOwner routes node events: a node carrying our taint re-triggers

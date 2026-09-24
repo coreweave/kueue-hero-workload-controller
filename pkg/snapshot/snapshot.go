@@ -122,7 +122,7 @@ func Build(in Input) *Snapshot {
 			continue // not part of this topology level
 		}
 		nodeDomain[node.Name] = domainID
-		usable := nodeIsUsable(node, in.Cfg.TaintKey, in.Self)
+		usable := NodeUsable(node, in.Cfg.TaintKey, in.Self)
 		nodeUsable[node.Name] = usable
 
 		d := s.domain(domainID)
@@ -197,12 +197,12 @@ func (s *Snapshot) domain(id string) *Domain {
 	return d
 }
 
-// nodeIsUsable reports whether the hero could land on this node: Ready,
+// NodeUsable reports whether the hero could land on this node: Ready,
 // schedulable, and free of taints the hero cannot tolerate. The hero's OWN
 // drain taint (key + owner match) does not disqualify — the hero tolerates
 // it and the drained nodes are its destination. Everything else with
 // NoSchedule/NoExecute does, including another hero's drain taint.
-func nodeIsUsable(node *corev1.Node, taintKey string, self types.NamespacedName) bool {
+func NodeUsable(node *corev1.Node, taintKey string, self types.NamespacedName) bool {
 	if node.Spec.Unschedulable {
 		return false
 	}
@@ -218,6 +218,13 @@ func nodeIsUsable(node *corev1.Node, taintKey string, self types.NamespacedName)
 		}
 		return false
 	}
+	return nodeIsReady(node) // no Ready condition = unknown health = unusable
+}
+
+// nodeIsReady reports whether the node's Ready condition is True. It reads only
+// the condition's status, not its heartbeat timestamp, which changes constantly
+// and says nothing about health. A node with no Ready condition is not ready.
+func nodeIsReady(node *corev1.Node) bool {
 	ready := false
 	for i := range node.Status.Conditions {
 		c := &node.Status.Conditions[i]
@@ -225,7 +232,7 @@ func nodeIsUsable(node *corev1.Node, taintKey string, self types.NamespacedName)
 			ready = c.Status == corev1.ConditionTrue // last entry wins
 		}
 	}
-	return ready // no Ready condition = unknown health = unusable
+	return ready
 }
 
 // markHeroDomains sets HasOtherHero on every domain where any podset of any
