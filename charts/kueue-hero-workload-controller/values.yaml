@@ -66,6 +66,23 @@ resources:
   limits:
     memory: 512Mi
 
+# Go's soft memory limit. A container memory limit alone is invisible to
+# the Go runtime: it sizes the heap at roughly twice the live set and keeps
+# growing until the kernel OOM-kills the process. GOMEMLIMIT makes the
+# collector work harder as the process approaches the ceiling instead,
+# trading CPU for staying alive.
+#
+# It is computed as this percentage of resources.limits.memory, so raising
+# the limit raises the heap ceiling with it. The remainder covers the
+# non-heap footprint (goroutine stacks, runtime bookkeeping, the mapped
+# binary). Set to null to leave GOMEMLIMIT unset.
+#
+# The informer caches dominate the heap and grow with the number of nodes
+# and pods, so size resources.limits.memory against the cluster the release
+# runs on rather than trusting the default: watch the container's memory use
+# after a rollout and raise the limit if it sits near the ceiling.
+goMemLimitPercentage: 75
+
 nodeSelector: {}
 tolerations: []
 affinity: {}
